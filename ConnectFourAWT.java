@@ -2,6 +2,7 @@ import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Canvas;
 import java.awt.Color;
+import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -125,6 +126,32 @@ public class ConnectFourAWT extends java.awt.Frame {
         }
 
         boardCanvas.repaint();
+        if (gameOver && winnerPlayer != 0) {
+            showWinnerPopup();
+        }
+    }
+
+    private void showWinnerPopup() {
+        String playerName = getPlayerName(winnerPlayer);
+        Dialog winnerDialog = new Dialog(this, currentLanguage == Language.DE ? "Spielende" : "Game over", true);
+        winnerDialog.setLayout(new BorderLayout(12, 12));
+        winnerDialog.add(new Label(currentLanguage == Language.DE
+                ? "Spieler " + playerName + " hat gewonnen!"
+                : "Player " + playerName + " wins!"), BorderLayout.CENTER);
+
+        Button closeButton = new Button("OK");
+        closeButton.addActionListener(event -> winnerDialog.dispose());
+        winnerDialog.add(closeButton, BorderLayout.SOUTH);
+        winnerDialog.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent event) {
+                winnerDialog.dispose();
+            }
+        });
+
+        winnerDialog.pack();
+        winnerDialog.setLocationRelativeTo(this);
+        winnerDialog.setVisible(true);
     }
 
     private void updateStatusLabel() {
