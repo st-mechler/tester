@@ -114,7 +114,7 @@ public class ConnectFourAWT extends java.awt.Frame {
         }
         return true;
     }
-
+ // dasfasd
     private boolean hasWinner(int row, int col, int player) {
         return countConnected(row, col, 1, 0, player) >= 4
             || countConnected(row, col, 0, 1, player) >= 4
