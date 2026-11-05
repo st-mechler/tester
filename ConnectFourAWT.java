@@ -26,6 +26,7 @@ public class ConnectFourAWT extends java.awt.Frame {
     }
 
     private final int[][] board = new int[ROWS][COLUMNS];
+    private final boolean[][] winningCells = new boolean[ROWS][COLUMNS];
     private int currentPlayer = 1;
     private int winnerPlayer = 0;
     private boolean gameOver = false;
@@ -88,6 +89,7 @@ public class ConnectFourAWT extends java.awt.Frame {
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLUMNS; col++) {
                 board[row][col] = 0;
+                winningCells[row][col] = false;
             }
         }
 
@@ -166,10 +168,35 @@ public class ConnectFourAWT extends java.awt.Frame {
     }
 
     private boolean hasWinner(int row, int col, int player) {
-        return countConnected(row, col, 1, 0, player) >= 4
-                || countConnected(row, col, 0, 1, player) >= 4
-                || countConnected(row, col, 1, 1, player) >= 4
-                || countConnected(row, col, 1, -1, player) >= 4;
+        boolean foundWinningLine = markWinningLine(row, col, 1, 0, player);
+        foundWinningLine |= markWinningLine(row, col, 0, 1, player);
+        foundWinningLine |= markWinningLine(row, col, 1, 1, player);
+        foundWinningLine |= markWinningLine(row, col, 1, -1, player);
+        return foundWinningLine;
+    }
+
+    private boolean markWinningLine(int row, int col, int dr, int dc, int player) {
+        if (countConnected(row, col, dr, dc, player) < 4) {
+            return false;
+        }
+
+        int firstRow = row;
+        int firstCol = col;
+        while (firstRow - dr >= 0 && firstRow - dr < ROWS
+                && firstCol - dc >= 0 && firstCol - dc < COLUMNS
+                && board[firstRow - dr][firstCol - dc] == player) {
+            firstRow -= dr;
+            firstCol -= dc;
+        }
+
+        while (firstRow >= 0 && firstRow < ROWS && firstCol >= 0 && firstCol < COLUMNS
+                && board[firstRow][firstCol] == player) {
+            winningCells[firstRow][firstCol] = true;
+            firstRow += dr;
+            firstCol += dc;
+        }
+
+        return true;
     }
 
     private int countConnected(int row, int col, int dr, int dc, int player) {
@@ -234,7 +261,10 @@ public class ConnectFourAWT extends java.awt.Frame {
                     graphics2D.setColor(Color.WHITE);
                     graphics2D.fillOval(x + 6, y + 6, discSize, discSize);
 
-                    if (board[row][col] == 1) {
+                    if (winningCells[row][col]) {
+                        graphics2D.setColor(new Color(35, 155, 70));
+                        graphics2D.fillOval(x + 8, y + 8, discSize - 4, discSize - 4);
+                    } else if (board[row][col] == 1) {
                         graphics2D.setColor(new Color(210, 35, 35));
                         graphics2D.fillOval(x + 8, y + 8, discSize - 4, discSize - 4);
                     } else if (board[row][col] == 2) {
