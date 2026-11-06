@@ -26,12 +26,18 @@ public class ConnectFourAWT extends java.awt.Frame {
         EN
     }
 
+    private enum GameMode {
+        TWO_PLAYER,
+        COMPUTER
+    }
+
     private final int[][] board = new int[ROWS][COLUMNS];
     private final boolean[][] winningCells = new boolean[ROWS][COLUMNS];
     private int currentPlayer = 1;
     private int winnerPlayer = 0;
     private boolean gameOver = false;
     private Language currentLanguage = Language.DE;
+    private GameMode gameMode = GameMode.TWO_PLAYER;
 
     private final Label statusLabel = new Label();
     private final Button resetButton = new Button();
@@ -67,11 +73,43 @@ public class ConnectFourAWT extends java.awt.Frame {
         });
 
         applyLanguage();
-        resetGame();
 
         pack();
         setResizable(false);
         setLocationRelativeTo(null);
+    }
+
+    private void chooseGameMode() {
+        Dialog modeDialog = new Dialog(this, currentLanguage == Language.DE ? "Spielmodus wählen" : "Choose game mode", true);
+        modeDialog.setLayout(new BorderLayout(12, 12));
+        modeDialog.add(new Label(currentLanguage == Language.DE ? "Wie möchtest du spielen?" : "How would you like to play?", Label.CENTER),
+                BorderLayout.CENTER);
+
+        Panel modePanel = new Panel();
+        Button twoPlayerButton = new Button(currentLanguage == Language.DE ? "2 Spieler" : "2 Players");
+        Button computerButton = new Button(currentLanguage == Language.DE ? "Computer" : "Computer");
+        twoPlayerButton.addActionListener(event -> {
+            gameMode = GameMode.TWO_PLAYER;
+            modeDialog.dispose();
+        });
+        computerButton.addActionListener(event -> {
+            gameMode = GameMode.COMPUTER;
+            modeDialog.dispose();
+        });
+        modePanel.add(twoPlayerButton);
+        modePanel.add(computerButton);
+        modeDialog.add(modePanel, BorderLayout.SOUTH);
+        modeDialog.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent event) {
+                modeDialog.dispose();
+            }
+        });
+
+        modeDialog.pack();
+        modeDialog.setResizable(false);
+        modeDialog.setLocationRelativeTo(this);
+        modeDialog.setVisible(true);
     }
 
     private void switchLanguage() {
@@ -112,6 +150,14 @@ public class ConnectFourAWT extends java.awt.Frame {
             return;
         }
 
+        playMove(column);
+        if (!gameOver && gameMode == GameMode.COMPUTER && currentPlayer == 2) {
+            playMove(chooseComputerMove());
+        }
+    }
+
+    private void playMove(int column) {
+        int row = getAvailableRow(column);
         board[row][column] = currentPlayer;
 
         if (hasWinner(row, column, currentPlayer)) {
@@ -131,6 +177,41 @@ public class ConnectFourAWT extends java.awt.Frame {
         if (gameOver && winnerPlayer != 0) {
             showWinnerPopup();
         }
+    }
+
+    private int chooseComputerMove() {
+        int[] preferredColumns = {3, 2, 4, 1, 5, 0, 6};
+        for (int column : preferredColumns) {
+            if (wouldWin(column, 2)) {
+                return column;
+            }
+        }
+        for (int column : preferredColumns) {
+            if (wouldWin(column, 1)) {
+                return column;
+            }
+        }
+        for (int column : preferredColumns) {
+            if (getAvailableRow(column) >= 0) {
+                return column;
+            }
+        }
+        return -1;
+    }
+
+    private boolean wouldWin(int column, int player) {
+        int row = getAvailableRow(column);
+        if (row < 0) {
+            return false;
+        }
+
+        board[row][column] = player;
+        boolean wins = countConnected(row, column, 1, 0, player) >= 4
+                || countConnected(row, column, 0, 1, player) >= 4
+                || countConnected(row, column, 1, 1, player) >= 4
+                || countConnected(row, column, 1, -1, player) >= 4;
+        board[row][column] = 0;
+        return wins;
     }
 
     private void showWinnerPopup() {
@@ -249,6 +330,9 @@ public class ConnectFourAWT extends java.awt.Frame {
     }
 
     private String getPlayerName(int player) {
+        if (player == 2 && gameMode == GameMode.COMPUTER) {
+            return "Computer";
+        }
         if (currentLanguage == Language.DE) {
             return player == 1 ? "Rot" : "Gelb";
         }
@@ -305,6 +389,8 @@ public class ConnectFourAWT extends java.awt.Frame {
 
     public static void main(String[] args) {
         ConnectFourAWT game = new ConnectFourAWT();
+        game.chooseGameMode();
+        game.resetGame();
         game.setVisible(true);
     }
 }
