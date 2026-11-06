@@ -15,10 +15,10 @@ AWT-basierter Vier-Gewinnt-Prototyp fuer Desktop.
 - Dialoge fuer Spielmodus und Spielende
 
 ## Computerlogik
-Priorisierte Spaltenauswahl mit einfacher Taktik:
-1. Sofortigen Gewinnzug spielen
-2. Sofortigen gegnerischen Gewinnzug blocken
-3. Naechste verfuegbare Spalte nach Prioritaet waehlen
+- Vor dem Computer-Spiel wird ein Schwierigkeitsgrad ausgewaehlt.
+- Einfach waehlt zufaellig eine verfuegbare Spalte.
+- Mittel spielt sofortige Gewinnzuege, blockt sofortige gegnerische Gewinnzuege und bevorzugt danach die Mitte.
+- Schwer verwendet eine Minimax-Suche mit Alpha-Beta-Schnitt und einer Brettbewertung.
 
 ## UI-Verhalten
 - Klick auf Spalte setzt Stein in die naechstfreie Zeile

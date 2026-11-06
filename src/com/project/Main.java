@@ -16,12 +16,14 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Main extends java.awt.Frame {
     private static final int COLUMNS = 7;
     private static final int ROWS = 6;
     private static final int CELL_SIZE = 86;
     private static final int PADDING = 12;
+    private static final int[] PREFERRED_COLUMNS = {3, 2, 4, 1, 5, 0, 6};
 
     private enum Language {
         DE,
@@ -33,6 +35,12 @@ public class Main extends java.awt.Frame {
         COMPUTER
     }
 
+    private enum Difficulty {
+        EASY,
+        MEDIUM,
+        HARD
+    }
+
     private final int[][] board = new int[ROWS][COLUMNS];
     private final boolean[][] winningCells = new boolean[ROWS][COLUMNS];
     private int currentPlayer = 1;
@@ -40,6 +48,7 @@ public class Main extends java.awt.Frame {
     private boolean gameOver = false;
     private Language currentLanguage = Language.DE;
     private GameMode gameMode = GameMode.TWO_PLAYER;
+    private Difficulty difficulty = Difficulty.MEDIUM;
 
     private final Label statusLabel = new Label();
     private final Button resetButton = new Button();
@@ -97,6 +106,7 @@ public class Main extends java.awt.Frame {
         computerButton.addActionListener(event -> {
             gameMode = GameMode.COMPUTER;
             modeDialog.dispose();
+            chooseDifficulty();
         });
         modePanel.add(twoPlayerButton);
         modePanel.add(computerButton);
@@ -112,6 +122,46 @@ public class Main extends java.awt.Frame {
         modeDialog.setResizable(false);
         modeDialog.setLocationRelativeTo(this);
         modeDialog.setVisible(true);
+    }
+
+    private void chooseDifficulty() {
+        Dialog difficultyDialog = new Dialog(this,
+                currentLanguage == Language.DE ? "Schwierigkeitsgrad waehlen" : "Choose difficulty", true);
+        difficultyDialog.setLayout(new BorderLayout(12, 12));
+        difficultyDialog.add(new Label(currentLanguage == Language.DE
+                ? "Waehle den Schwierigkeitsgrad" : "Choose a difficulty", Label.CENTER), BorderLayout.CENTER);
+
+        Panel difficultyPanel = new Panel();
+        Button easyButton = new Button(currentLanguage == Language.DE ? "Einfach" : "Easy");
+        Button mediumButton = new Button(currentLanguage == Language.DE ? "Mittel" : "Medium");
+        Button hardButton = new Button(currentLanguage == Language.DE ? "Schwer" : "Hard");
+        easyButton.addActionListener(event -> {
+            difficulty = Difficulty.EASY;
+            difficultyDialog.dispose();
+        });
+        mediumButton.addActionListener(event -> {
+            difficulty = Difficulty.MEDIUM;
+            difficultyDialog.dispose();
+        });
+        hardButton.addActionListener(event -> {
+            difficulty = Difficulty.HARD;
+            difficultyDialog.dispose();
+        });
+        difficultyPanel.add(easyButton);
+        difficultyPanel.add(mediumButton);
+        difficultyPanel.add(hardButton);
+        difficultyDialog.add(difficultyPanel, BorderLayout.SOUTH);
+        difficultyDialog.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent event) {
+                difficultyDialog.dispose();
+            }
+        });
+
+        difficultyDialog.pack();
+        difficultyDialog.setResizable(false);
+        difficultyDialog.setLocationRelativeTo(this);
+        difficultyDialog.setVisible(true);
     }
 
     private void switchLanguage() {
@@ -182,23 +232,158 @@ public class Main extends java.awt.Frame {
     }
 
     private int chooseComputerMove() {
-        int[] preferredColumns = {3, 2, 4, 1, 5, 0, 6};
-        for (int column : preferredColumns) {
+        if (difficulty == Difficulty.EASY) {
+            return chooseEasyComputerMove();
+        }
+        if (difficulty == Difficulty.HARD) {
+            return chooseHardComputerMove();
+        }
+
+        for (int column : PREFERRED_COLUMNS) {
             if (wouldWin(column, 2)) {
                 return column;
             }
         }
-        for (int column : preferredColumns) {
+        for (int column : PREFERRED_COLUMNS) {
             if (wouldWin(column, 1)) {
                 return column;
             }
         }
-        for (int column : preferredColumns) {
+        for (int column : PREFERRED_COLUMNS) {
             if (getAvailableRow(column) >= 0) {
                 return column;
             }
         }
         return -1;
+    }
+
+    private int chooseEasyComputerMove() {
+        int[] availableColumns = new int[COLUMNS];
+        int count = 0;
+        for (int column = 0; column < COLUMNS; column++) {
+            if (getAvailableRow(column) >= 0) {
+                availableColumns[count++] = column;
+            }
+        }
+        return count == 0 ? -1 : availableColumns[ThreadLocalRandom.current().nextInt(count)];
+    }
+
+    private int chooseHardComputerMove() {
+        int bestScore = Integer.MIN_VALUE;
+        int bestColumn = -1;
+        int alpha = Integer.MIN_VALUE;
+        for (int column : PREFERRED_COLUMNS) {
+            int row = getAvailableRow(column);
+            if (row < 0) {
+                continue;
+            }
+
+            board[row][column] = 2;
+            int score = minimax(5, alpha, Integer.MAX_VALUE, false, row, column, 2);
+            board[row][column] = 0;
+            if (score > bestScore) {
+                bestScore = score;
+                bestColumn = column;
+            }
+            alpha = Math.max(alpha, bestScore);
+        }
+        return bestColumn;
+    }
+
+    private int minimax(int depth, int alpha, int beta, boolean maximizingPlayer,
+            int lastRow, int lastColumn, int lastPlayer) {
+        if (isWinningMove(lastRow, lastColumn, lastPlayer)) {
+            return lastPlayer == 2 ? 100_000 + depth : -100_000 - depth;
+        }
+        if (depth == 0 || isBoardFull()) {
+            return evaluateBoard();
+        }
+
+        int bestScore = maximizingPlayer ? Integer.MIN_VALUE : Integer.MAX_VALUE;
+        int player = maximizingPlayer ? 2 : 1;
+        for (int column : PREFERRED_COLUMNS) {
+            int row = getAvailableRow(column);
+            if (row < 0) {
+                continue;
+            }
+
+            board[row][column] = player;
+            int score = minimax(depth - 1, alpha, beta, !maximizingPlayer, row, column, player);
+            board[row][column] = 0;
+            if (maximizingPlayer) {
+                bestScore = Math.max(bestScore, score);
+                alpha = Math.max(alpha, bestScore);
+            } else {
+                bestScore = Math.min(bestScore, score);
+                beta = Math.min(beta, bestScore);
+            }
+            if (beta <= alpha) {
+                break;
+            }
+        }
+        return bestScore;
+    }
+
+    private int evaluateBoard() {
+        int score = 0;
+        int centerColumn = COLUMNS / 2;
+        for (int row = 0; row < ROWS; row++) {
+            if (board[row][centerColumn] == 2) {
+                score += 3;
+            } else if (board[row][centerColumn] == 1) {
+                score -= 3;
+            }
+        }
+
+        for (int row = 0; row < ROWS; row++) {
+            for (int column = 0; column <= COLUMNS - 4; column++) {
+                score += scoreWindow(row, column, 0, 1);
+            }
+        }
+        for (int row = 0; row <= ROWS - 4; row++) {
+            for (int column = 0; column < COLUMNS; column++) {
+                score += scoreWindow(row, column, 1, 0);
+            }
+        }
+        for (int row = 0; row <= ROWS - 4; row++) {
+            for (int column = 0; column <= COLUMNS - 4; column++) {
+                score += scoreWindow(row, column, 1, 1);
+            }
+        }
+        for (int row = 3; row < ROWS; row++) {
+            for (int column = 0; column <= COLUMNS - 4; column++) {
+                score += scoreWindow(row, column, -1, 1);
+            }
+        }
+        return score;
+    }
+
+    private int scoreWindow(int row, int column, int rowStep, int columnStep) {
+        int computerPieces = 0;
+        int humanPieces = 0;
+        for (int offset = 0; offset < 4; offset++) {
+            int cell = board[row + offset * rowStep][column + offset * columnStep];
+            if (cell == 2) {
+                computerPieces++;
+            } else if (cell == 1) {
+                humanPieces++;
+            }
+        }
+
+        if (humanPieces == 0) {
+            return computerPieces == 3 ? 100 : computerPieces == 2 ? 10 : computerPieces;
+        }
+        if (computerPieces == 0) {
+            return humanPieces == 3 ? -120 : humanPieces == 2 ? -12 : -humanPieces;
+        }
+        return 0;
+    }
+
+    private boolean isWinningMove(int row, int column, int player) {
+        return countConnected(row, column, 1, 0, player) >= 4
+                || countConnected(row, column, 0, 1, player) >= 4
+                || countConnected(row, column, 1, 1, player) >= 4
+                || countConnected(row, column, 1, -1, player) >= 4;
     }
 
     private boolean wouldWin(int column, int player) {
@@ -208,10 +393,7 @@ public class Main extends java.awt.Frame {
         }
 
         board[row][column] = player;
-        boolean wins = countConnected(row, column, 1, 0, player) >= 4
-                || countConnected(row, column, 0, 1, player) >= 4
-                || countConnected(row, column, 1, 1, player) >= 4
-                || countConnected(row, column, 1, -1, player) >= 4;
+        boolean wins = isWinningMove(row, column, player);
         board[row][column] = 0;
         return wins;
     }
