@@ -1,3 +1,5 @@
+package com.project;
+
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Canvas;
@@ -15,7 +17,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
-public class ConnectFourAWT extends java.awt.Frame {
+public class Main extends java.awt.Frame {
     private static final int COLUMNS = 7;
     private static final int ROWS = 6;
     private static final int CELL_SIZE = 86;
@@ -44,7 +46,7 @@ public class ConnectFourAWT extends java.awt.Frame {
     private final Button languageButton = new Button();
     private final BoardCanvas boardCanvas = new BoardCanvas();
 
-    public ConnectFourAWT() {
+    public Main() {
         super("Vier-Gewinnt Pilot (AWT)");
 
         setLayout(new BorderLayout());
@@ -80,9 +82,9 @@ public class ConnectFourAWT extends java.awt.Frame {
     }
 
     private void chooseGameMode() {
-        Dialog modeDialog = new Dialog(this, currentLanguage == Language.DE ? "Spielmodus wählen" : "Choose game mode", true);
+        Dialog modeDialog = new Dialog(this, currentLanguage == Language.DE ? "Spielmodus waehlen" : "Choose game mode", true);
         modeDialog.setLayout(new BorderLayout(12, 12));
-        modeDialog.add(new Label(currentLanguage == Language.DE ? "Wie möchtest du spielen?" : "How would you like to play?", Label.CENTER),
+        modeDialog.add(new Label(currentLanguage == Language.DE ? "Wie moechtest du spielen?" : "How would you like to play?", Label.CENTER),
                 BorderLayout.CENTER);
 
         Panel modePanel = new Panel();
@@ -146,7 +148,7 @@ public class ConnectFourAWT extends java.awt.Frame {
 
         int row = getAvailableRow(column);
         if (row < 0) {
-            statusLabel.setText(currentLanguage == Language.DE ? "Spalte voll. Bitte wähle eine andere Spalte." : "Column is full. Please choose another column.");
+            statusLabel.setText(currentLanguage == Language.DE ? "Spalte voll. Bitte waehle eine andere Spalte." : "Column is full. Please choose another column.");
             return;
         }
 
@@ -388,7 +390,7 @@ public class ConnectFourAWT extends java.awt.Frame {
     }
 
     public static void main(String[] args) {
-        ConnectFourAWT game = new ConnectFourAWT();
+        Main game = new Main();
         game.chooseGameMode();
         game.resetGame();
         game.setVisible(true);

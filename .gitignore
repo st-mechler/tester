@@ -1,6 +1,3 @@
-ConnectFourAWT.class
-ConnectFourAWT.class
-ConnectFourAWT$1.class
-ConnectFourAWT$1.class
-ConnectFourAWT$BoardCanvas$1.class
-ConnectFourAWT$BoardCanvas.class
+bin/
+sources.txt
+*.class
