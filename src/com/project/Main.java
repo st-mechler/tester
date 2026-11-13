@@ -3,10 +3,12 @@ package com.project;
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Canvas;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Label;
@@ -22,6 +24,8 @@ public class Main extends java.awt.Frame {
     private static final int ROWS = 6;
     private static final int CELL_SIZE = 86;
     private static final int PADDING = 12;
+    private static final String START_SCREEN = "start";
+    private static final String GAME_SCREEN = "game";
 
     private enum Language {
         DE,
@@ -44,7 +48,12 @@ public class Main extends java.awt.Frame {
     private final Label statusLabel = new Label();
     private final Button resetButton = new Button();
     private final Button languageButton = new Button();
+    private final Button startButton = new Button();
+    private final Button startLanguageButton = new Button();
     private final BoardCanvas boardCanvas = new BoardCanvas();
+    private final StartScreenCanvas startScreenCanvas = new StartScreenCanvas();
+    private final CardLayout screenLayout = new CardLayout();
+    private final Panel screenPanel = new Panel(screenLayout);
 
     public Main() {
         super("Vier-Gewinnt Pilot (AWT)");
@@ -54,6 +63,12 @@ public class Main extends java.awt.Frame {
 
         resetButton.addActionListener(e -> resetGame());
         languageButton.addActionListener(e -> switchLanguage());
+        startLanguageButton.addActionListener(e -> switchLanguage());
+        startButton.addActionListener(e -> {
+            chooseGameMode();
+            resetGame();
+            screenLayout.show(screenPanel, GAME_SCREEN);
+        });
 
         Panel actionPanel = new Panel(new BorderLayout());
         actionPanel.add(languageButton, BorderLayout.WEST);
@@ -63,8 +78,20 @@ public class Main extends java.awt.Frame {
         bottomPanel.add(statusLabel, BorderLayout.CENTER);
         bottomPanel.add(actionPanel, BorderLayout.EAST);
 
-        add(boardCanvas, BorderLayout.CENTER);
-        add(bottomPanel, BorderLayout.SOUTH);
+        Panel gamePanel = new Panel(new BorderLayout());
+        gamePanel.add(boardCanvas, BorderLayout.CENTER);
+        gamePanel.add(bottomPanel, BorderLayout.SOUTH);
+
+        Panel startPanel = new Panel(new BorderLayout());
+        startPanel.add(startScreenCanvas, BorderLayout.CENTER);
+        Panel startActions = new Panel();
+        startActions.add(startLanguageButton);
+        startActions.add(startButton);
+        startPanel.add(startActions, BorderLayout.SOUTH);
+
+        screenPanel.add(startPanel, START_SCREEN);
+        screenPanel.add(gamePanel, GAME_SCREEN);
+        add(screenPanel, BorderLayout.CENTER);
 
         addWindowListener(new WindowAdapter() {
             @Override
@@ -118,12 +145,15 @@ public class Main extends java.awt.Frame {
         currentLanguage = currentLanguage == Language.DE ? Language.EN : Language.DE;
         applyLanguage();
         updateStatusLabel();
+        startScreenCanvas.repaint();
     }
 
     private void applyLanguage() {
         setTitle(currentLanguage == Language.DE ? "Vier-Gewinnt Pilot (AWT)" : "Connect Four Pilot (AWT)");
         resetButton.setLabel(currentLanguage == Language.DE ? "Neues Spiel" : "New game");
         languageButton.setLabel(currentLanguage == Language.DE ? "EN" : "DE");
+        startButton.setLabel(currentLanguage == Language.DE ? "Spiel starten" : "Start game");
+        startLanguageButton.setLabel(currentLanguage == Language.DE ? "EN" : "DE");
     }
 
     private void resetGame() {
@@ -389,10 +419,64 @@ public class Main extends java.awt.Frame {
         }
     }
 
+    private class StartScreenCanvas extends Canvas {
+        private final Color[] balloonColors = {
+                new Color(236, 83, 91),
+                new Color(255, 177, 66),
+                new Color(83, 177, 220),
+                new Color(157, 111, 205),
+                new Color(246, 111, 151)
+        };
+
+        StartScreenCanvas() {
+            setPreferredSize(new Dimension(COLUMNS * CELL_SIZE + (PADDING * 2),
+                    ROWS * CELL_SIZE + (PADDING * 2)));
+        }
+
+        @Override
+        public void paint(Graphics graphics) {
+            Graphics2D graphics2D = (Graphics2D) graphics;
+            graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics2D.setPaint(new GradientPaint(0, 0, new Color(255, 240, 207),
+                    0, getHeight(), new Color(145, 216, 226)));
+            graphics2D.fillRect(0, 0, getWidth(), getHeight());
+
+            graphics2D.setColor(new Color(255, 255, 255, 150));
+            graphics2D.fillOval(getWidth() / 2 - 100, getHeight() - 115, 320, 150);
+            graphics2D.fillOval(-90, getHeight() - 95, 300, 140);
+            graphics2D.fillOval(getWidth() - 180, getHeight() - 105, 300, 150);
+
+            int[] positions = {15, 32, 50, 68, 85};
+            int[] heights = {200, 260, 185, 245, 205};
+            for (int i = 0; i < positions.length; i++) {
+                int balloonX = getWidth() * positions[i] / 100 - 30;
+                int balloonY = heights[i];
+                graphics2D.setColor(new Color(75, 96, 116, 150));
+                graphics2D.drawLine(balloonX + 30, balloonY + 68, balloonX + 38, getHeight() - 65);
+                graphics2D.setColor(balloonColors[i]);
+                graphics2D.fillOval(balloonX, balloonY, 60, 76);
+                graphics2D.fillPolygon(new int[] {balloonX + 25, balloonX + 35, balloonX + 30},
+                        new int[] {balloonY + 70, balloonY + 70, balloonY + 82}, 3);
+                graphics2D.setColor(new Color(255, 255, 255, 120));
+                graphics2D.fillOval(balloonX + 12, balloonY + 12, 12, 25);
+            }
+
+            graphics2D.setColor(new Color(46, 69, 92));
+            graphics2D.setFont(new Font("SansSerif", Font.BOLD, 38));
+            String title = currentLanguage == Language.DE ? "Vier gewinnt!" : "Connect Four!";
+            int titleWidth = graphics2D.getFontMetrics().stringWidth(title);
+            graphics2D.drawString(title, (getWidth() - titleWidth) / 2, 105);
+
+            graphics2D.setFont(new Font("SansSerif", Font.PLAIN, 20));
+            String subtitle = currentLanguage == Language.DE
+                    ? "Bereit fuer eine Runde?" : "Ready for a round?";
+            int subtitleWidth = graphics2D.getFontMetrics().stringWidth(subtitle);
+            graphics2D.drawString(subtitle, (getWidth() - subtitleWidth) / 2, 142);
+        }
+    }
+
     public static void main(String[] args) {
         Main game = new Main();
-        game.chooseGameMode();
-        game.resetGame();
         game.setVisible(true);
     }
 }

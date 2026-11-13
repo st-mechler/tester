@@ -1,6 +1,7 @@
 # Vier-Gewinnt Pilot (Java + AWT)
 
 Ein einfacher erster Pilot mit:
+- Ballon-Startbildschirm mit Sprachumschaltung
 - 7x6 Spielfeld
 - Zwei Spieler (Rot/Gelb)
 - Optionaler Computergegner
