@@ -7,15 +7,24 @@ import java.awt.Color;
 import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Label;
+import java.awt.LinearGradientPaint;
 import java.awt.Panel;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.LineUnavailableException;
 
 public class Main extends java.awt.Frame {
     private static final int COLUMNS = 7;
@@ -33,8 +42,75 @@ public class Main extends java.awt.Frame {
         COMPUTER
     }
 
+    @FunctionalInterface
+    private interface SoundEffect extends AutoCloseable {
+        void play();
+
+        @Override
+        default void close() {
+        }
+    }
+
+    private static final class DropSound implements SoundEffect {
+        private final Clip clip;
+
+        DropSound() {
+            Clip preparedClip = null;
+            AudioInputStream audioStream = null;
+            try {
+                int sampleRate = 22_050;
+                int frameCount = sampleRate / 8;
+                AudioFormat format = new AudioFormat(sampleRate, 16, 1, true, false);
+                byte[] audioData = new byte[frameCount * 2];
+                for (int frame = 0; frame < frameCount; frame++) {
+                    double progress = (double) frame / frameCount;
+                    double frequency = 620 - (360 * progress);
+                    double envelope = (1 - progress) * (1 - progress);
+                    short sample = (short) (Math.sin(2 * Math.PI * frequency * frame / sampleRate)
+                            * envelope * 15_000);
+                    audioData[frame * 2] = (byte) sample;
+                    audioData[frame * 2 + 1] = (byte) (sample >> 8);
+                }
+
+                audioStream = new AudioInputStream(new ByteArrayInputStream(audioData), format, frameCount);
+                preparedClip = AudioSystem.getClip();
+                preparedClip.open(audioStream);
+            } catch (LineUnavailableException | IOException | RuntimeException exception) {
+                if (preparedClip != null) {
+                    preparedClip.close();
+                    preparedClip = null;
+                }
+            } finally {
+                if (audioStream != null) {
+                    try {
+                        audioStream.close();
+                    } catch (IOException ignored) {
+                    }
+                }
+            }
+            clip = preparedClip;
+        }
+
+        @Override
+        public synchronized void play() {
+            if (clip != null) {
+                clip.stop();
+                clip.setFramePosition(0);
+                clip.start();
+            }
+        }
+
+        @Override
+        public synchronized void close() {
+            if (clip != null) {
+                clip.close();
+            }
+        }
+    }
+
     private final int[][] board = new int[ROWS][COLUMNS];
     private final boolean[][] winningCells = new boolean[ROWS][COLUMNS];
+    private final SoundEffect dropSound = new DropSound();
     private int currentPlayer = 1;
     private int winnerPlayer = 0;
     private boolean gameOver = false;
@@ -50,16 +126,27 @@ public class Main extends java.awt.Frame {
         super("Vier-Gewinnt Pilot (AWT)");
 
         setLayout(new BorderLayout());
-        statusLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+        setBackground(new Color(7, 12, 35));
+        statusLabel.setFont(new Font("SansSerif", Font.BOLD, 15));
+        statusLabel.setForeground(new Color(169, 230, 255));
+        statusLabel.setBackground(new Color(7, 12, 35));
+        resetButton.setFont(new Font("SansSerif", Font.BOLD, 13));
+        resetButton.setBackground(new Color(24, 93, 154));
+        resetButton.setForeground(Color.WHITE);
+        languageButton.setFont(new Font("SansSerif", Font.BOLD, 13));
+        languageButton.setBackground(new Color(24, 93, 154));
+        languageButton.setForeground(Color.WHITE);
 
         resetButton.addActionListener(e -> resetGame());
         languageButton.addActionListener(e -> switchLanguage());
 
         Panel actionPanel = new Panel(new BorderLayout());
+        actionPanel.setBackground(new Color(7, 12, 35));
         actionPanel.add(languageButton, BorderLayout.WEST);
         actionPanel.add(resetButton, BorderLayout.EAST);
 
         Panel bottomPanel = new Panel(new BorderLayout());
+        bottomPanel.setBackground(new Color(7, 12, 35));
         bottomPanel.add(statusLabel, BorderLayout.CENTER);
         bottomPanel.add(actionPanel, BorderLayout.EAST);
 
@@ -69,6 +156,7 @@ public class Main extends java.awt.Frame {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent event) {
+                dropSound.close();
                 dispose();
                 System.exit(0);
             }
@@ -161,6 +249,7 @@ public class Main extends java.awt.Frame {
     private void playMove(int column) {
         int row = getAvailableRow(column);
         board[row][column] = currentPlayer;
+        dropSound.play();
 
         if (hasWinner(row, column, currentPlayer)) {
             winnerPlayer = currentPlayer;
@@ -346,11 +435,15 @@ public class Main extends java.awt.Frame {
             int width = COLUMNS * CELL_SIZE + (PADDING * 2);
             int height = ROWS * CELL_SIZE + (PADDING * 2);
             setPreferredSize(new Dimension(width, height));
-            setBackground(new Color(25, 88, 172));
+            setBackground(new Color(5, 9, 29));
 
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent event) {
+                    if (event.getX() < PADDING || event.getX() >= PADDING + COLUMNS * CELL_SIZE
+                            || event.getY() < PADDING || event.getY() >= PADDING + ROWS * CELL_SIZE) {
+                        return;
+                    }
                     int column = (event.getX() - PADDING) / CELL_SIZE;
                     handleMove(column);
                 }
@@ -359,33 +452,80 @@ public class Main extends java.awt.Frame {
 
         @Override
         public void paint(Graphics graphics) {
-            Graphics2D graphics2D = (Graphics2D) graphics;
+            Graphics2D graphics2D = (Graphics2D) graphics.create();
             graphics2D.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            graphics2D.setColor(new Color(25, 88, 172));
+            graphics2D.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            graphics2D.setPaint(new GradientPaint(0, 0, new Color(5, 9, 29),
+                    getWidth(), getHeight(), new Color(18, 30, 75)));
             graphics2D.fillRect(0, 0, getWidth(), getHeight());
+            drawStarfield(graphics2D);
+
+            int boardWidth = COLUMNS * CELL_SIZE;
+            int boardHeight = ROWS * CELL_SIZE;
+            graphics2D.setColor(new Color(0, 0, 0, 110));
+            graphics2D.fillRoundRect(PADDING + 5, PADDING + 8, boardWidth, boardHeight, 30, 30);
+            graphics2D.setPaint(new GradientPaint(PADDING, PADDING, new Color(52, 164, 255),
+                    PADDING + boardWidth, PADDING + boardHeight, new Color(24, 55, 142)));
+            graphics2D.fillRoundRect(PADDING, PADDING, boardWidth, boardHeight, 28, 28);
+            graphics2D.setColor(new Color(131, 223, 255, 190));
+            graphics2D.drawRoundRect(PADDING + 1, PADDING + 1, boardWidth - 3, boardHeight - 3, 26, 26);
+            graphics2D.setColor(new Color(8, 24, 79, 190));
+            graphics2D.drawRoundRect(PADDING + 5, PADDING + 5, boardWidth - 11, boardHeight - 11, 22, 22);
 
             for (int row = 0; row < ROWS; row++) {
                 for (int col = 0; col < COLUMNS; col++) {
                     int x = PADDING + col * CELL_SIZE;
                     int y = PADDING + row * CELL_SIZE;
-                    int discSize = CELL_SIZE - 12;
-
-                    graphics2D.setColor(Color.WHITE);
-                    graphics2D.fillOval(x + 6, y + 6, discSize, discSize);
-
-                    if (winningCells[row][col]) {
-                        graphics2D.setColor(new Color(35, 155, 70));
-                        graphics2D.fillOval(x + 8, y + 8, discSize - 4, discSize - 4);
-                    } else if (board[row][col] == 1) {
-                        graphics2D.setColor(new Color(210, 35, 35));
-                        graphics2D.fillOval(x + 8, y + 8, discSize - 4, discSize - 4);
-                    } else if (board[row][col] == 2) {
-                        graphics2D.setColor(new Color(235, 196, 20));
-                        graphics2D.fillOval(x + 8, y + 8, discSize - 4, discSize - 4);
+                    drawSlot(graphics2D, x, y);
+                    if (board[row][col] != 0) {
+                        drawDisc(graphics2D, x, y, board[row][col], winningCells[row][col]);
                     }
                 }
             }
+            graphics2D.dispose();
+        }
+
+        private void drawStarfield(Graphics2D graphics2D) {
+            for (int star = 0; star < 64; star++) {
+                int x = (star * 97 + 31) % Math.max(1, getWidth());
+                int y = (star * 193 + 17) % Math.max(1, getHeight());
+                int brightness = 90 + (star * 37 % 150);
+                graphics2D.setColor(new Color(150, 210, 255, brightness));
+                graphics2D.fillOval(x, y, star % 9 == 0 ? 3 : 2, star % 9 == 0 ? 3 : 2);
+            }
+        }
+
+        private void drawSlot(Graphics2D graphics2D, int x, int y) {
+            int size = CELL_SIZE - 18;
+            graphics2D.setColor(new Color(7, 21, 65, 180));
+            graphics2D.fillOval(x + 8, y + 10, size + 2, size + 2);
+            graphics2D.setPaint(new GradientPaint(x + 12, y + 12, new Color(9, 22, 66),
+                    x + size + 14, y + size + 14, new Color(27, 62, 132)));
+            graphics2D.fillOval(x + 9, y + 9, size, size);
+            graphics2D.setColor(new Color(109, 196, 255, 95));
+            graphics2D.drawOval(x + 9, y + 9, size, size);
+        }
+
+        private void drawDisc(Graphics2D graphics2D, int x, int y, int player, boolean winning) {
+            int size = CELL_SIZE - 28;
+            int discX = x + (CELL_SIZE - size) / 2;
+            int discY = y + (CELL_SIZE - size) / 2;
+            graphics2D.setColor(new Color(0, 0, 0, 100));
+            graphics2D.fillOval(discX + 3, discY + 5, size, size);
+
+            Color highlight = winning ? new Color(194, 255, 208)
+                    : player == 1 ? new Color(255, 150, 143) : new Color(255, 247, 151);
+            Color base = winning ? new Color(25, 153, 93)
+                    : player == 1 ? new Color(198, 29, 61) : new Color(238, 166, 25);
+            Color shadow = winning ? new Color(7, 91, 63)
+                    : player == 1 ? new Color(105, 17, 49) : new Color(164, 77, 12);
+            graphics2D.setPaint(new LinearGradientPaint(discX, discY, discX + size, discY + size,
+                    new float[] {0.0f, 0.48f, 1.0f}, new Color[] {highlight, base, shadow}));
+            graphics2D.fillOval(discX, discY, size, size);
+            graphics2D.setColor(new Color(255, 255, 255, 135));
+            graphics2D.fillOval(discX + size / 5, discY + size / 7, size / 3, size / 6);
+            graphics2D.setColor(new Color(255, 255, 255, 115));
+            graphics2D.drawOval(discX, discY, size, size);
         }
     }
 
